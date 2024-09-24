@@ -3,12 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	airthings "github.com/scottlaird/airthings-exporter"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	airthings "github.com/scottlaird/airthings-exporter"
 )
 
 type DeviceResponse struct {
@@ -46,16 +48,18 @@ var (
 		"client-id", "", "Client ID from https://dashboard.airthings.com/integrations/api-integration")
 	clientSecret = flag.String(
 		"client-secret", "", "Client secret from https://dashboard.airthings.com/integrations/api-integration")
+	port = flag.String(
+		"port", "", "Port to listen on for HTTP requests")
 )
 
 func main() {
 	flag.Parse()
-	
-	if (*clientID=="") || (*clientSecret=="") {
-		fmt.Printf("Required --client-id and/or --client-secret parameters missing.\n")
+
+	if (*clientID == "") || (*clientSecret == "") || (*port == "") {
+		fmt.Printf("Required --port, --client-id and/or --client-secret parameters missing.\n")
 		os.Exit(1)
 	}
-	
+
 	ac := airthings.NewAPIClient(*clientID, *clientSecret)
 
 	err := ac.AuthenticateIfNeeded()
@@ -66,11 +70,8 @@ func main() {
 
 	err = ac.GetDevices()
 	if err != nil {
-		fmt.Printf("Failed to get device list from Airthings: %v\n", err)
-		os.Exit(1)
+		log.Println("Warning: error fetching devices from Airthings API: ", err)
 	}
-
-	fmt.Printf("Found: %d devices\n", len(ac.Devices))
 
 	reg := prometheus.NewPedanticRegistry()
 	collector := airthings.NewAirthingsCollector(ac)
@@ -82,5 +83,5 @@ func main() {
 	)
 
 	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", *port), nil))
 }

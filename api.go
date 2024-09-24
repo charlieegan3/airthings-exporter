@@ -22,9 +22,8 @@ type DeviceResponse struct {
 
 type devicesResponse struct {
 	Devices []*DeviceResponse `json:"devices"`
-	Offset  int              `json:"offset"`
+	Offset  int               `json:"offset"`
 }
-
 
 // These are the values returned by my AirThings View Plus right now.
 type DataValues struct {
@@ -45,18 +44,16 @@ type dataResponse struct {
 	Data DataValues `json:"data"`
 }
 
-
 type APIClient struct {
 	clientID, clientSecret string
-	accessToken string
-	expires time.Time
-	Devices []*DeviceResponse
+	accessToken            string
+	expires                time.Time
+	Devices                []*DeviceResponse
 }
-
 
 func NewAPIClient(clientID, clientSecret string) *APIClient {
 	a := &APIClient{
-		clientID: clientID,
+		clientID:     clientID,
 		clientSecret: clientSecret,
 	}
 
@@ -70,12 +67,12 @@ func (a *APIClient) clearAuthentication() {
 
 func (a *APIClient) AuthenticateIfNeeded() error {
 	now := time.Now()
-	
+
 	if a.expires.After(now) {
 		// don't re-authenticate if our request hasn't expired
 		return nil
 	}
-	
+
 	resp, err := http.PostForm(
 		"https://accounts-api.airthings.com/v1/token",
 		url.Values{
@@ -83,7 +80,6 @@ func (a *APIClient) AuthenticateIfNeeded() error {
 			"client_id":     {a.clientID},
 			"client_secret": {a.clientSecret},
 		})
-
 	if err != nil {
 		a.clearAuthentication()
 		return err
@@ -104,7 +100,7 @@ func (a *APIClient) AuthenticateIfNeeded() error {
 	}
 
 	a.accessToken = token.AccessToken
-	a.expires = now.Add(time.Duration(token.ExpiresIn-10)*time.Second)
+	a.expires = now.Add(time.Duration(token.ExpiresIn-10) * time.Second)
 
 	return nil
 }
@@ -124,6 +120,10 @@ func (a *APIClient) GetDevices() error {
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
+	}
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("Received response %q, not 200 OK\n", resp.Status)
 	}
 
 	devices := devicesResponse{}

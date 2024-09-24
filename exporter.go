@@ -1,7 +1,10 @@
 package airthings
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -63,23 +66,35 @@ func (c *AirthingsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (c *AirthingsCollector) Collect(ch chan<- prometheus.Metric) {
 	err := c.client.AuthenticateIfNeeded()
 	if err != nil {
-		// TODO: log error
+		log.Println("Error authenticating with Airthings API: ", err)
+
 		return
 	}
 
 	err = c.client.GetDevices() // should really be cached
 	if err != nil {
-		// TODO: log error
+		log.Println("Error fetching devices from Airthings API: ", err)
+
 		return
 	}
 
 	for _, d := range c.client.Devices {
 		data, err := c.client.GetDeviceData(d)
 		if err != nil {
-			// TODO: log error
+			log.Println("Error fetching data for device: ", d.Id, err)
+
 			return
 		}
-		fmt.Printf("Battery: %d, %s\n", data.Battery, d.Id)
+
+		bs, err := json.MarshalIndent(data, "", "  ")
+		if err != nil {
+			log.Println("Error marshalling data: ", err)
+
+			return
+		}
+
+		fmt.Printf("Data: %s\n", string(bs))
+
 		ch <- prometheus.MustNewConstMetric(batteryDesc, prometheus.GaugeValue, float64(data.Battery), d.Id)
 		ch <- prometheus.MustNewConstMetric(co2Desc, prometheus.GaugeValue, data.CO2, d.Id)
 		ch <- prometheus.MustNewConstMetric(humDesc, prometheus.GaugeValue, data.Humidity, d.Id)
@@ -90,6 +105,4 @@ func (c *AirthingsCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(tempDesc, prometheus.GaugeValue, data.Temp, d.Id)
 		ch <- prometheus.MustNewConstMetric(vocDesc, prometheus.GaugeValue, data.VOC, d.Id)
 	}
-
-	return
 }
